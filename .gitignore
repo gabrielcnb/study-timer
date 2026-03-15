@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+banco_horas.txt
+historico.csv
+historico.json
+*.log
+.DS_Store
+Thumbs.db
