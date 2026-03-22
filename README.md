@@ -1,51 +1,52 @@
-# study-timer-pomodoro
+# Study Timer Pomodoro
+
+[![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CustomTkinter](https://img.shields.io/badge/UI-CustomTkinter-orange)](https://github.com/TomSchimansky/CustomTkinter)
 
 Desktop study timer with Pomodoro mode, per-subject tracking, session history, and chart reports.
 
-## Screenshot
-
-![Study Timer UI](docs/screenshot.png)
-
-*No screenshot available yet. Place a screenshot at `docs/screenshot.png`.*
-
 ## Features
 
-- Continuous timer mode and Pomodoro mode (configurable number of focus/break cycles, default: 4)
-- Per-subject time tracking with built-in subjects (General, Math, Portuguese, English, History, Science) plus user-defined subjects added at runtime
-- Daily target with progress bar showing completion toward the configured goal (default: 60 minutes)
-- Session history persisted to `historico.csv` with columns: date, subject, duration, mode
+- Continuous timer mode (count-up) and Pomodoro mode with configurable focus/break cycles
+- Per-subject time tracking with built-in subjects (Geral, Matematica, Portugues, Ingles, Historia, Ciencias) and custom subjects added at runtime
+- Daily target with progress bar showing completion toward a configurable goal (default: 60 min)
+- Session history persisted to CSV with date, subject, duration, and mode
 - Manual session entry for logging study time without running the timer
-- Bar chart reports via matplotlib showing time invested per subject
+- Bar chart reports via matplotlib showing daily study hours (last 7 days)
+- Gamification levels: Iniciante, Avancado, Mestre do Estudo based on total hours
+- Full session history viewer in a separate window
 - Data export to JSON
-- System tray integration (minimize to tray, restore on click)
+- System tray integration via pystray (minimize to tray, restore on click)
 - Theme switcher: dark-blue, green, purple, light
+- Tabbed interface: Estudo, Relatorios, Configuracoes
+- Auto-saves session on window close if timer is running
 
 ## Stack
 
 | Component | Library | Purpose |
 |---|---|---|
 | UI framework | customtkinter | Main window, tabs, buttons, progress bar |
-| Charts | matplotlib (TkAgg backend) | Session history bar charts |
+| Charts | matplotlib (TkAgg) | Daily study hours bar charts |
 | System tray | pystray | Minimize-to-tray icon |
 | Icon rendering | Pillow | Dynamic tray icon generation |
-| Session history | csv (stdlib) | Persistent session log |
+| Session history | csv (stdlib) | Persistent session log (`historico.csv`) |
 | Data export | json (stdlib) | JSON export of all session data |
 
-## Setup / Installation
+## Setup
 
 **Requirements:** Python 3.9+
 
 ```bash
 git clone https://github.com/gabrielcnb/study-timer-pomodoro.git
 cd study-timer-pomodoro
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-pip install customtkinter matplotlib pystray Pillow
-python main.py
+Or install manually:
+
+```bash
+pip install customtkinter matplotlib pystray pillow
 ```
 
 ## Usage
@@ -56,34 +57,31 @@ python main.py
 
 **Continuous mode:**
 1. Select a subject from the dropdown.
-2. Click "Start". The timer counts up.
-3. Click "Stop" to end the session. The duration is saved to `historico.csv`.
+2. Click "Iniciar". The timer counts up.
+3. Click "Pausar" to stop. The duration is saved to `historico.csv`.
 
 **Pomodoro mode:**
-1. Go to the "Settings" tab and click "Activate Pomodoro Mode".
-2. Set the number of cycles in the "Pomodoro Cycles" field.
-3. Return to the "Study" tab and click "Start". The timer alternates between focus and break intervals automatically.
+1. Go to "Configuracoes" tab and click "Ativar Modo Pomodoro".
+2. Set the number of cycles (default: 4).
+3. Return to "Estudo" tab and click "Iniciar". Focus and break intervals alternate automatically based on the daily target.
 
-**Manual entry:**
-Click "Register Manually" to log a study duration without running the timer — useful for sessions tracked on paper or offline.
+**Manual entry:** Click "Registrar Manualmente" to log minutes without running the timer.
 
-**Reports:**
-Go to the "Reports" tab and click "Generate Chart" to see a bar chart of total time per subject.
+**Reports:** Go to "Relatorios" tab and click "Gerar Grafico" to see a bar chart of daily study hours.
 
-**Export:**
-In the "Settings" tab, click "Export Data (JSON)" to dump all session records to a JSON file.
-
-**Session history file:**
-```
-historico.csv   (created automatically in the working directory on first run)
-```
+**Export:** In "Configuracoes", click "Exportar Dados (JSON)" to save all records to `historico.json`.
 
 ## File Structure
 
 ```
 study-timer-pomodoro/
-├── main.py          # Full application: timer logic, UI, CSV persistence, chart reports
-├── historico.csv    # Auto-generated session log
-├── app_icon.ico     # Optional window icon (place in project root)
+├── main.py           # Full application: timer, UI, CSV persistence, charts
+├── app_icon.ico      # Window icon
+├── requirements.txt  # pip dependencies
+├── LICENSE           # MIT
 └── README.md
 ```
+
+## License
+
+[MIT](LICENSE)
