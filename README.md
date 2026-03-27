@@ -14,12 +14,12 @@ Desktop study timer with Pomodoro mode, per-subject tracking, session history, a
 - Session history persisted to CSV with date, subject, duration, and mode
 - Manual session entry for logging study time without running the timer
 - Bar chart reports via matplotlib showing daily study hours (last 7 days)
-- Gamification levels: Iniciante, Avancado, Mestre do Estudo based on total hours
+- Gamification levels: Beginner, Advanced, Study Master based on total hours
 - Full session history viewer in a separate window
 - Data export to JSON
 - System tray integration via pystray (minimize to tray, restore on click)
 - Theme switcher: dark-blue, green, purple, light
-- Tabbed interface: Estudo, Relatorios, Configuracoes
+- Tabbed interface: Study, Reports, Settings
 - Auto-saves session on window close if timer is running
 
 ## Stack
@@ -57,19 +57,19 @@ python main.py
 
 **Continuous mode:**
 1. Select a subject from the dropdown.
-2. Click "Iniciar". The timer counts up.
-3. Click "Pausar" to stop. The duration is saved to `historico.csv`.
+2. Click "Start". The timer counts up.
+3. Click "Pause" to stop. The duration is saved to `historico.csv`.
 
 **Pomodoro mode:**
-1. Go to "Configuracoes" tab and click "Ativar Modo Pomodoro".
+1. Go to "Settings" tab and click "Enable Pomodoro Mode".
 2. Set the number of cycles (default: 4).
-3. Return to "Estudo" tab and click "Iniciar". Focus and break intervals alternate automatically based on the daily target.
+3. Return to "Study" tab and click "Start". Focus and break intervals alternate automatically based on the daily target.
 
-**Manual entry:** Click "Registrar Manualmente" to log minutes without running the timer.
+**Manual entry:** Click "Log Manually" to log minutes without running the timer.
 
-**Reports:** Go to "Relatorios" tab and click "Gerar Grafico" to see a bar chart of daily study hours.
+**Reports:** Go to "Reports" tab and click "Generate Chart" to see a bar chart of daily study hours.
 
-**Export:** In "Configuracoes", click "Exportar Dados (JSON)" to save all records to `historico.json`.
+**Export:** In "Settings", click "Export Data (JSON)" to save all records to `historico.json`.
 
 ## File Structure
 
