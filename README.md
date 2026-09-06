@@ -1,10 +1,10 @@
-# Study Timer Pomodoro
+# Study Timer
+
+Desktop study timer with Pomodoro mode, per-subject tracking, session history, and chart reports.
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CustomTkinter](https://img.shields.io/badge/UI-CustomTkinter-orange)](https://github.com/TomSchimansky/CustomTkinter)
-
-Desktop study timer with Pomodoro mode, per-subject tracking, session history, and chart reports.
 
 ## Features
 
@@ -38,8 +38,8 @@ Desktop study timer with Pomodoro mode, per-subject tracking, session history, a
 **Requirements:** Python 3.9+
 
 ```bash
-git clone https://github.com/gabrielcnb/study-timer-pomodoro.git
-cd study-timer-pomodoro
+git clone https://github.com/gabrielcnb/study-timer.git
+cd study-timer
 pip install -r requirements.txt
 ```
 
@@ -74,7 +74,7 @@ python main.py
 ## File Structure
 
 ```
-study-timer-pomodoro/
+study-timer/
 ├── main.py           # Full application: timer, UI, CSV persistence, charts
 ├── app_icon.ico      # Window icon
 ├── requirements.txt  # pip dependencies
