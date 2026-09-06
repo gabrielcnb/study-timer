@@ -8,14 +8,14 @@ from datetime import datetime, timedelta
 import tkinter
 from tkinter import messagebox, simpledialog
 
-# Tenta importar o matplotlib para os gráficos
+# matplotlib is optional: without it the charts tab degrades gracefully
 try:
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
     import matplotlib.pyplot as plt
 except ImportError:
     plt = None
 
-# Tenta importar pystray e PIL para o ícone da bandeja do sistema
+# pystray and PIL are optional: they only power the system tray icon
 try:
     import pystray
     from PIL import Image, ImageDraw
@@ -23,207 +23,204 @@ except ImportError:
     pystray = None
 
 
-class CronometroEstudo:
+class StudyTimer:
     def __init__(self):
-        # Configuração inicial de aparência e tema
+        # Appearance and theme
         customtkinter.set_appearance_mode("dark")
         customtkinter.set_default_color_theme("dark-blue")
 
-        # Janela principal (auto-dimensionável)
+        # Main window
         self.root = customtkinter.CTk()
-        self.root.title("Cronômetro & Estatísticas de Estudo")
+        self.root.title("Study Timer & Statistics")
         self.root.geometry("500x600")
         self.root.minsize(500, 600)
         try:
-            self.root.iconbitmap("app_icon.ico")  # Certifique-se de ter um arquivo chamado app_icon.ico
+            self.root.iconbitmap("app_icon.ico")  # expects an app_icon.ico next to this file
         except Exception as e:
-            print("Ícone não encontrado:", e)
+            print("Icon not found:", e)
 
-        # Variáveis de controle do tempo e modos
-        self.daily_target = 60 * 60  # Tempo alvo diário em segundos (padrão: 60 min)
+        # Timing and mode state
+        self.daily_target = 60 * 60  # daily target in seconds (default: 60 min)
         self.pomodoro_mode = False
         self.in_break = False
-        self.session_time = 0         # Para modo contínuo
-        self.focus_time = 0           # Tempo de foco na sessão Pomodoro (atual segmento)
-        self.break_time = 0           # Tempo de pausa na sessão Pomodoro
-        self.total_focus = 0          # Acumula todos os períodos de foco na sessão Pomodoro
-        self.running = False          # Sessão ativa ou não
+        self.session_time = 0         # continuous mode
+        self.focus_time = 0           # focus time in the current Pomodoro segment
+        self.break_time = 0           # break time in the current Pomodoro segment
+        self.total_focus = 0          # every focus stretch in the Pomodoro session
+        self.running = False          # is a session active
         self.last_update = time.time()
-        self.current_mode = "Contínuo"  # ou "Pomodoro"
+        self.current_mode = "Continuous"  # or "Pomodoro"
 
-        # Lista de matérias (disponível para o usuário)
-        self.subjects = ["Geral", "Matemática", "Português", "Inglês", "História", "Ciências"]
-        self.current_subject = "Geral"
+        # Subjects offered to the user
+        self.subjects = ["General", "Maths", "Portuguese", "English", "History", "Science"]
+        self.current_subject = "General"
 
-        # Arquivo CSV para histórico de sessões (cria com cabeçalho, se não existir)
-        self.history_file = "historico.csv"
+        # Session history CSV (created with a header if missing)
+        self.history_file = "history.csv"
         if not os.path.exists(self.history_file):
             with open(self.history_file, "w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerow(["data", "categoria", "duracao", "modo"])
+                writer.writerow(["date", "subject", "duration", "mode"])
 
-        # Cria uma interface com abas para separar funcionalidades
+        # Tabbed interface
         self.tabview = customtkinter.CTkTabview(self.root)
         self.tabview.pack(fill="both", expand=True, padx=10, pady=10)
-        self.tabview.add("Estudo")
-        self.tabview.add("Relatórios")
-        self.tabview.add("Configurações")
-        self.tab_estudo = self.tabview.tab("Estudo")
-        self.tab_relatorios = self.tabview.tab("Relatórios")
-        self.tab_config = self.tabview.tab("Configurações")
+        self.tabview.add("Study")
+        self.tabview.add("Reports")
+        self.tabview.add("Settings")
+        self.tab_study = self.tabview.tab("Study")
+        self.tab_reports = self.tabview.tab("Reports")
+        self.tab_config = self.tabview.tab("Settings")
 
         # ----------------------------
-        # Aba "Estudo"
+        # "Study" tab
         # ----------------------------
-        # Label do cronômetro (mostra tempo da sessão ou de foco/pausa no Pomodoro)
+        # Timer label (session time, or focus/break time in Pomodoro mode)
         self.timer_label = customtkinter.CTkLabel(
-            master=self.tab_estudo, text="Sessão: 00:00:00", font=("Arial", 24)
+            master=self.tab_study, text="Session: 00:00:00", font=("Arial", 24)
         )
         self.timer_label.pack(pady=10)
 
-        # Barra de progresso (representa o avanço até atingir o tempo alvo)
-        self.progress_bar = customtkinter.CTkProgressBar(master=self.tab_estudo)
+        # Progress towards the daily target
+        self.progress_bar = customtkinter.CTkProgressBar(master=self.tab_study)
         self.progress_bar.set(0)
         self.progress_bar.pack(pady=10, fill="x", padx=20)
 
-        # Menu para selecionar a matéria
+        # Subject picker
         self.subject_menu = customtkinter.CTkOptionMenu(
-            master=self.tab_estudo, values=self.subjects, command=self.set_subject
+            master=self.tab_study, values=self.subjects, command=self.set_subject
         )
-        self.subject_menu.set("Geral")
+        self.subject_menu.set("General")
         self.subject_menu.pack(pady=10)
 
-        # Botão para iniciar/pausar a sessão
+        # Start/pause the session
         self.toggle_button = customtkinter.CTkButton(
-            master=self.tab_estudo, text="Iniciar", command=self.toggle_pause
+            master=self.tab_study, text="Start", command=self.toggle_pause
         )
         self.toggle_button.pack(pady=10)
 
-        # Botão para registrar horas manualmente (caso o usuário estude offline)
+        # Log hours by hand, for study done away from the app
         self.manual_button = customtkinter.CTkButton(
-            master=self.tab_estudo, text="Registrar Manualmente", command=self.registrar_manual
+            master=self.tab_study, text="Log Manually", command=self.log_manual
         )
         self.manual_button.pack(pady=10)
 
-        # Exibe o tempo investido em cada matéria
+        # Time spent per subject
         self.subject_stats_label = customtkinter.CTkLabel(
-            master=self.tab_estudo, text="Tempo Investido por Matéria:\n", font=("Arial", 12)
+            master=self.tab_study, text="Time Spent per Subject:\n", font=("Arial", 12)
         )
         self.subject_stats_label.pack(pady=10)
-        self.atualizar_estatisticas_materias()
+        self.refresh_subject_stats()
 
         # ----------------------------
-        # Aba "Relatórios"
+        # "Reports" tab
         # ----------------------------
         self.graph_button = customtkinter.CTkButton(
-            master=self.tab_relatorios, text="Gerar Gráfico", command=self.gerar_grafico
+            master=self.tab_reports, text="Generate Chart", command=self.generate_chart
         )
         self.graph_button.pack(pady=10)
 
         self.history_button = customtkinter.CTkButton(
-            master=self.tab_relatorios, text="Histórico Completo", command=self.mostrar_historico
+            master=self.tab_reports, text="Full History", command=self.show_history
         )
         self.history_button.pack(pady=10)
 
         self.stats_label = customtkinter.CTkLabel(
-            master=self.tab_relatorios, text="Estatísticas: ", font=("Arial", 16)
+            master=self.tab_reports, text="Statistics: ", font=("Arial", 16)
         )
         self.stats_label.pack(pady=10)
 
         # ----------------------------
-        # Aba "Configurações"
+        # "Settings" tab
         # ----------------------------
-        # Tempo alvo diário (minutos)
+        # Daily target in minutes
         self.label_target = customtkinter.CTkLabel(
-            master=self.tab_config, text="Tempo Alvo Diário (min):", font=("Arial", 14)
+            master=self.tab_config, text="Daily Target (min):", font=("Arial", 14)
         )
         self.label_target.pack(pady=5)
         self.entry_target = customtkinter.CTkEntry(master=self.tab_config, width=60)
         self.entry_target.insert(0, str(self.daily_target // 60))
         self.entry_target.pack(pady=5)
         self.btn_set_target = customtkinter.CTkButton(
-            master=self.tab_config, text="Definir Tempo Alvo", command=self.definir_tempo_alvo
+            master=self.tab_config, text="Set Daily Target", command=self.set_daily_target
         )
         self.btn_set_target.pack(pady=5)
 
-        # Ciclos Pomodoro
+        # Pomodoro cycles
         self.label_pomodoro = customtkinter.CTkLabel(
-            master=self.tab_config, text="Ciclos Pomodoro:", font=("Arial", 14)
+            master=self.tab_config, text="Pomodoro Cycles:", font=("Arial", 14)
         )
         self.label_pomodoro.pack(pady=5)
         self.entry_pomodoro_cycles = customtkinter.CTkEntry(master=self.tab_config, width=60)
         self.entry_pomodoro_cycles.insert(0, "4")
         self.entry_pomodoro_cycles.pack(pady=5)
 
-        # Seleção de tema
-        self.label_tema = customtkinter.CTkLabel(
-            master=self.tab_config, text="Tema:", font=("Arial", 14)
+        # Theme picker
+        self.label_theme = customtkinter.CTkLabel(
+            master=self.tab_config, text="Theme:", font=("Arial", 14)
         )
-        self.label_tema.pack(pady=5)
-        self.temas = ["dark-blue", "green", "purple", "light"]
-        self.option_tema = customtkinter.CTkOptionMenu(
-            master=self.tab_config, values=self.temas, command=self.alterar_tema
+        self.label_theme.pack(pady=5)
+        self.themes = ["dark-blue", "green", "purple", "light"]
+        self.option_theme = customtkinter.CTkOptionMenu(
+            master=self.tab_config, values=self.themes, command=self.change_theme
         )
-        self.option_tema.set("dark-blue")
-        self.option_tema.pack(pady=5)
+        self.option_theme.set("dark-blue")
+        self.option_theme.pack(pady=5)
 
-        # Toggle para ativar/desativar Modo Pomodoro
+        # Pomodoro mode toggle
         self.toggle_pomodoro = customtkinter.CTkButton(
-            master=self.tab_config, text="Ativar Modo Pomodoro", command=self.toggle_pomodoro_mode
+            master=self.tab_config, text="Enable Pomodoro Mode", command=self.toggle_pomodoro_mode
         )
         self.toggle_pomodoro.pack(pady=5)
 
-        # Botão para exportar os dados para JSON
+        # Export history to JSON
         self.export_button = customtkinter.CTkButton(
-            master=self.tab_config, text="Exportar Dados (JSON)", command=self.exportar_dados
+            master=self.tab_config, text="Export Data (JSON)", command=self.export_data
         )
         self.export_button.pack(pady=5)
 
-        # Botão para simular backup na nuvem
+        # Simulated cloud backup
         self.backup_button = customtkinter.CTkButton(
-            master=self.tab_config, text="Backup na Nuvem", command=self.backup_nuvem
+            master=self.tab_config, text="Cloud Backup", command=self.cloud_backup
         )
         self.backup_button.pack(pady=5)
 
-        # Adicionar nova matéria
-        self.label_adicionar_materia = customtkinter.CTkLabel(
-            master=self.tab_config, text="Adicionar Matéria:", font=("Arial", 14)
+        # Add a new subject
+        self.label_add_subject = customtkinter.CTkLabel(
+            master=self.tab_config, text="Add Subject:", font=("Arial", 14)
         )
-        self.label_adicionar_materia.pack(pady=5)
-        self.entry_adicionar_materia = customtkinter.CTkEntry(master=self.tab_config, width=140)
-        self.entry_adicionar_materia.pack(pady=5)
-        self.btn_adicionar_materia = customtkinter.CTkButton(
-            master=self.tab_config, text="Adicionar", command=self.adicionar_materia
+        self.label_add_subject.pack(pady=5)
+        self.entry_add_subject = customtkinter.CTkEntry(master=self.tab_config, width=140)
+        self.entry_add_subject.pack(pady=5)
+        self.btn_add_subject = customtkinter.CTkButton(
+            master=self.tab_config, text="Add", command=self.add_subject
         )
-        self.btn_adicionar_materia.pack(pady=5)
+        self.btn_add_subject.pack(pady=5)
 
-        # Botão para minimizar para a bandeja do sistema (se pystray estiver disponível)
+        # Minimise to the system tray, when pystray is available
         if pystray is not None:
             self.btn_tray = customtkinter.CTkButton(
-                master=self.tab_config, text="Minimizar para Tray", command=self.minimizar_para_tray
+                master=self.tab_config, text="Minimise to Tray", command=self.minimise_to_tray
             )
             self.btn_tray.pack(pady=5)
 
-        # Atualiza o cronômetro a cada segundo
-        self.atualizar_cronometro()
+        # Tick the timer once a second
+        self.update_timer()
 
-        # Ao fechar a janela, registra a sessão atual e encerra adequadamente
+        # Log the running session before the window closes
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.mainloop()
 
-    # Atualiza o assunto selecionado
     def set_subject(self, value):
         self.current_subject = value
 
-    # Alterna entre iniciar e pausar a sessão
+    # Start the session, or pause it and log the accumulated time
     def toggle_pause(self):
         if not self.running:
-            # Inicia a sessão
             self.running = True
             self.last_update = time.time()
-            self.toggle_button.configure(text="Pausar")
+            self.toggle_button.configure(text="Pause")
         else:
-            # Pausa a sessão e registra o tempo acumulado
             if self.pomodoro_mode:
                 duration = self.total_focus
                 mode = "Pomodoro"
@@ -233,15 +230,15 @@ class CronometroEstudo:
                 self.in_break = False
             else:
                 duration = self.session_time
-                mode = "Contínuo"
+                mode = "Continuous"
                 self.session_time = 0
             if duration > 0:
-                self.registrar_sessao(duration, mode)
+                self.log_session(duration, mode)
             self.running = False
-            self.toggle_button.configure(text="Iniciar")
+            self.toggle_button.configure(text="Start")
 
-    # Atualiza o cronômetro a cada segundo; adapta o modo Pomodoro conforme o tempo alvo e ciclos definidos
-    def atualizar_cronometro(self):
+    # Tick once a second; in Pomodoro mode, derive focus/break from the target and cycles
+    def update_timer(self):
         if self.running:
             current_time = time.time()
             elapsed = int(current_time - self.last_update)
@@ -254,7 +251,7 @@ class CronometroEstudo:
                         cycles = 4
                     if cycles < 1:
                         cycles = 1
-                    # Cálculo baseado em 90% do tempo para foco e 10% para pausas
+                    # 90% of the target goes to focus, 10% to breaks
                     focus_interval = int(self.daily_target * 0.9 / cycles)
                     break_interval = int(self.daily_target * 0.1 / (cycles - 1)) if cycles > 1 else 0
 
@@ -262,13 +259,13 @@ class CronometroEstudo:
                         self.focus_time += elapsed
                         self.total_focus += elapsed
                         if self.focus_time >= focus_interval:
-                            messagebox.showinfo("Pomodoro", f"Fim do foco! Iniciando pausa de {break_interval//60} minutos.")
+                            messagebox.showinfo("Pomodoro", f"Focus over. Starting a {break_interval//60} minute break.")
                             self.in_break = True
                             self.break_time = 0
                     else:
                         self.break_time += elapsed
                         if self.break_time >= break_interval:
-                            messagebox.showinfo("Pomodoro", "Pausa encerrada. Retomando foco.")
+                            messagebox.showinfo("Pomodoro", "Break over. Back to focus.")
                             self.in_break = False
                             self.focus_time = 0
                 else:
@@ -276,102 +273,98 @@ class CronometroEstudo:
 
                 if self.pomodoro_mode:
                     if self.in_break:
-                        tempo_display = str(timedelta(seconds=self.break_time))
-                        mode_text = "Pausa"
+                        time_display = str(timedelta(seconds=self.break_time))
+                        mode_text = "Break"
                     else:
-                        tempo_display = str(timedelta(seconds=self.focus_time))
-                        mode_text = "Foco"
-                    self.timer_label.configure(text=f"{mode_text}: {tempo_display}")
+                        time_display = str(timedelta(seconds=self.focus_time))
+                        mode_text = "Focus"
+                    self.timer_label.configure(text=f"{mode_text}: {time_display}")
                     progress = self.total_focus / self.daily_target
                 else:
-                    self.timer_label.configure(text="Sessão: " + str(timedelta(seconds=self.session_time)))
+                    self.timer_label.configure(text="Session: " + str(timedelta(seconds=self.session_time)))
                     progress = self.session_time / self.daily_target
 
                 progress = min(progress, 1)
                 self.progress_bar.set(progress)
-        self.root.after(1000, self.atualizar_cronometro)
+        self.root.after(1000, self.update_timer)
 
-    # Registra a sessão atual no histórico (arquivo CSV)
-    def registrar_sessao(self, duration, mode):
+    # Append the session to the history CSV
+    def log_session(self, duration, mode):
         with open(self.history_file, "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             writer.writerow([now, self.current_subject, duration, mode])
 
-    # Permite ao usuário registrar horas manualmente (caso o cronômetro não esteja ligado)
-    def registrar_manual(self):
+    # Log study time by hand, for sessions the timer never saw
+    def log_manual(self):
         try:
-            minutos = float(simpledialog.askstring("Registro Manual", "Digite minutos estudados:"))
-            duration = int(minutos * 60)
-            self.registrar_sessao(duration, "Manual")
-            messagebox.showinfo("Registro Manual", f"{minutos} minutos registrados manualmente.")
+            minutes = float(simpledialog.askstring("Manual Entry", "Minutes studied:"))
+            duration = int(minutes * 60)
+            self.log_session(duration, "Manual")
+            messagebox.showinfo("Manual Entry", f"{minutes} minutes logged.")
         except Exception as e:
-            messagebox.showerror("Erro", "Entrada inválida.")
+            messagebox.showerror("Error", "Invalid input.")
 
-    # Define o tempo alvo diário a partir do valor inserido (minutos)
-    def definir_tempo_alvo(self):
+    def set_daily_target(self):
         try:
-            minutos = float(self.entry_target.get())
-            self.daily_target = int(minutos * 60)
-            messagebox.showinfo("Tempo Alvo", f"Tempo alvo diário definido para {minutos} minutos.")
+            minutes = float(self.entry_target.get())
+            self.daily_target = int(minutes * 60)
+            messagebox.showinfo("Daily Target", f"Daily target set to {minutes} minutes.")
         except Exception as e:
-            messagebox.showerror("Erro", "Por favor, insira um número válido.")
+            messagebox.showerror("Error", "Please enter a valid number.")
 
-    # Altera o tema da interface
-    def alterar_tema(self, tema):
-        customtkinter.set_default_color_theme(tema)
-        messagebox.showinfo("Tema", f"Tema alterado para {tema}.")
+    def change_theme(self, theme):
+        customtkinter.set_default_color_theme(theme)
+        messagebox.showinfo("Theme", f"Theme changed to {theme}.")
 
-    # Alterna o modo Pomodoro
     def toggle_pomodoro_mode(self):
         self.pomodoro_mode = not self.pomodoro_mode
         if self.pomodoro_mode:
-            self.toggle_pomodoro.configure(text="Desativar Modo Pomodoro")
+            self.toggle_pomodoro.configure(text="Disable Pomodoro Mode")
             self.current_mode = "Pomodoro"
             self.focus_time = 0
             self.break_time = 0
             self.total_focus = 0
             self.in_break = False
-            messagebox.showinfo("Pomodoro", "Modo Pomodoro ativado.\nO tempo de foco e pausa será calculado com base no tempo alvo diário e nos ciclos definidos.")
+            messagebox.showinfo("Pomodoro", "Pomodoro mode enabled.\nFocus and break lengths come from the daily target and the number of cycles.")
         else:
-            self.toggle_pomodoro.configure(text="Ativar Modo Pomodoro")
-            self.current_mode = "Contínuo"
-            messagebox.showinfo("Pomodoro", "Modo Pomodoro desativado.")
+            self.toggle_pomodoro.configure(text="Enable Pomodoro Mode")
+            self.current_mode = "Continuous"
+            messagebox.showinfo("Pomodoro", "Pomodoro mode disabled.")
 
-    # Exporta os dados do histórico para um arquivo JSON
-    def exportar_dados(self):
+    def export_data(self):
         if not os.path.exists(self.history_file):
-            messagebox.showerror("Erro", "Arquivo de histórico não encontrado.")
+            messagebox.showerror("Error", "History file not found.")
             return
         data = []
         with open(self.history_file, "r") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 data.append(row)
-        with open("historico.json", "w") as jsonfile:
+        with open("history.json", "w") as jsonfile:
             json.dump(data, jsonfile, indent=4)
-        messagebox.showinfo("Exportar Dados", "Dados exportados para historico.json com sucesso.")
+        messagebox.showinfo("Export Data", "Data exported to history.json.")
 
-    # Simula o backup dos dados na nuvem (apenas simulação)
-    def backup_nuvem(self):
-        messagebox.showinfo("Backup", "Backup realizado com sucesso na nuvem (simulação).")
+    # Placeholder: no cloud backend is wired up
+    def cloud_backup(self):
+        messagebox.showinfo("Backup", "Cloud backup completed (simulated).")
 
-    # Gera um gráfico das horas de estudo diárias usando matplotlib
-    def gerar_grafico(self):
+    # Chart the last seven days of study hours
+    def generate_chart(self):
         if plt is None:
-            messagebox.showerror("Erro", "Matplotlib não está instalado.")
+            messagebox.showerror("Error", "Matplotlib is not installed.")
             return
 
         data_agg = {}
         with open(self.history_file, "r") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                date_str = row["data"].split(" ")[0]
+                date_str = row["date"].split(" ")[0]
                 try:
-                    duracao = int(row["duracao"])
+                    duration = int(row["duration"])
                 except:
                     continue
-                data_agg[date_str] = data_agg.get(date_str, 0) + duracao / 3600  # em horas
+                data_agg[date_str] = data_agg.get(date_str, 0) + duration / 3600  # in hours
 
         if data_agg:
             dates = sorted(data_agg.keys())[-7:]
@@ -382,35 +375,34 @@ class CronometroEstudo:
 
         fig, ax = plt.subplots(figsize=(5, 3))
         ax.bar(dates, hours, color='skyblue')
-        ax.set_title("Horas de Estudo Diárias")
-        ax.set_ylabel("Horas")
+        ax.set_title("Daily Study Hours")
+        ax.set_ylabel("Hours")
         if hours:
             ax.set_ylim(0, max(hours + [self.daily_target / 3600, 1]))
         else:
             ax.set_ylim(0, self.daily_target / 3600 if self.daily_target > 0 else 1)
 
-        total = self.calcular_total_estudado() / 3600
+        total = self.total_studied() / 3600
         avg = sum(hours) / len(hours) if hours else 0
         if total < 10:
-            level = "Iniciante"
+            level = "Beginner"
         elif total < 50:
-            level = "Avançado"
+            level = "Advanced"
         else:
-            level = "Mestre do estudo"
+            level = "Study master"
         self.stats_label.configure(
-            text=f"Total Estudado: {total:.2f}h | Média: {avg:.2f}h/dia | Nível: {level}"
+            text=f"Total Studied: {total:.2f}h | Average: {avg:.2f}h/day | Level: {level}"
         )
 
         top = customtkinter.CTkToplevel(self.root)
-        top.title("Gráfico de Estudo Diário")
+        top.title("Daily Study Chart")
         canvas = FigureCanvasTkAgg(fig, master=top)
         canvas.draw()
         canvas.get_tk_widget().pack()
 
-    # Mostra o histórico completo em uma nova janela
-    def mostrar_historico(self):
+    def show_history(self):
         top = customtkinter.CTkToplevel(self.root)
-        top.title("Histórico Completo")
+        top.title("Full History")
         txt = tkinter.Text(top, width=80, height=20)
         txt.pack()
         if os.path.exists(self.history_file):
@@ -418,87 +410,82 @@ class CronometroEstudo:
                 content = csvfile.read()
                 txt.insert("end", content)
         else:
-            txt.insert("end", "Nenhum registro encontrado.")
+            txt.insert("end", "No records found.")
 
-    # Calcula o total de tempo estudado (em segundos) a partir do histórico
-    def calcular_total_estudado(self):
+    # Total studied time in seconds, across the whole history
+    def total_studied(self):
         total = 0
         if os.path.exists(self.history_file):
             with open(self.history_file, "r") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     try:
-                        total += int(row["duracao"])
+                        total += int(row["duration"])
                     except:
                         pass
         return total
 
-    # Atualiza as estatísticas de tempo investido por matéria e as exibe na UI
-    def atualizar_estatisticas_materias(self):
+    # Recompute per-subject totals and refresh the label every five seconds
+    def refresh_subject_stats(self):
         subject_totals = {}
         if os.path.exists(self.history_file):
             with open(self.history_file, "r") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     try:
-                        duracao = int(row["duracao"])
+                        duration = int(row["duration"])
                     except:
-                        duracao = 0
-                    subject = row["categoria"]
-                    subject_totals[subject] = subject_totals.get(subject, 0) + duracao
-        text = "Tempo Investido por Matéria:\n"
+                        duration = 0
+                    subject = row["subject"]
+                    subject_totals[subject] = subject_totals.get(subject, 0) + duration
+        text = "Time Spent per Subject:\n"
         for subj, secs in subject_totals.items():
             text += f"{subj}: {str(timedelta(seconds=secs))}\n"
         self.subject_stats_label.configure(text=text)
-        self.root.after(5000, self.atualizar_estatisticas_materias)
+        self.root.after(5000, self.refresh_subject_stats)
 
-    # Adiciona uma nova matéria à lista de matérias
-    def adicionar_materia(self):
-        nova_materia = self.entry_adicionar_materia.get().strip()
-        if nova_materia and nova_materia not in self.subjects:
-            self.subjects.append(nova_materia)
+    def add_subject(self):
+        new_subject = self.entry_add_subject.get().strip()
+        if new_subject and new_subject not in self.subjects:
+            self.subjects.append(new_subject)
             self.subject_menu.configure(values=self.subjects)
-            messagebox.showinfo("Matéria", f"Matéria '{nova_materia}' adicionada.")
+            messagebox.showinfo("Subject", f"Subject '{new_subject}' added.")
         else:
-            messagebox.showerror("Erro", "Matéria inválida ou já existente.")
+            messagebox.showerror("Error", "Invalid or duplicate subject.")
 
-    # Minimiza para a bandeja do sistema usando pystray
-    def minimizar_para_tray(self):
-        self.root.withdraw()  # Esconde a janela principal
+    def minimise_to_tray(self):
+        self.root.withdraw()  # hide the main window
         if pystray is not None:
-            image = self.criar_imagem_tray()
+            image = self.build_tray_image()
             menu = pystray.Menu(
-                pystray.MenuItem("Abrir", self.mostrar_janela),
-                pystray.MenuItem("Sair", self.sair_tray)
+                pystray.MenuItem("Open", self.show_window),
+                pystray.MenuItem("Quit", self.quit_from_tray)
             )
-            self.tray_icon = pystray.Icon("app", image, "Cronômetro de Estudo", menu)
-            # Executa o ícone da bandeja em um thread separado
+            self.tray_icon = pystray.Icon("app", image, "Study Timer", menu)
+            # pystray runs the icon on its own thread
             self.tray_icon.run()
 
-    # Cria uma imagem para o ícone da bandeja (usando PIL)
-    def criar_imagem_tray(self):
+    def build_tray_image(self):
         image = Image.new('RGB', (64, 64), color="black")
         dc = ImageDraw.Draw(image)
         dc.ellipse((0, 0, 64, 64), fill="blue")
         return image
 
-    # Callback para mostrar a janela principal ao clicar no tray
-    def mostrar_janela(self, icon, item):
-        self.root.after(0, self.mostrar_janela_callback)
+    def show_window(self, icon, item):
+        self.root.after(0, self.show_window_callback)
 
-    def mostrar_janela_callback(self):
+    def show_window_callback(self):
         self.root.deiconify()
         if hasattr(self, "tray_icon") and self.tray_icon is not None:
             self.tray_icon.stop()
             self.tray_icon = None
 
-    # Sai do aplicativo a partir do ícone da bandeja
-    def sair_tray(self, icon, item):
+    def quit_from_tray(self, icon, item):
         if hasattr(self, "tray_icon") and self.tray_icon is not None:
             self.tray_icon.stop()
         self.root.destroy()
 
-    # Ao fechar a janela, registra a sessão atual (se houver) e encerra o aplicativo
+    # Log whatever is running before shutting down
     def on_close(self):
         if self.running:
             if self.pomodoro_mode:
@@ -506,10 +493,10 @@ class CronometroEstudo:
             else:
                 duration = self.session_time
             if duration > 0:
-                mode = "Pomodoro" if self.pomodoro_mode else "Contínuo"
-                self.registrar_sessao(duration, mode)
+                mode = "Pomodoro" if self.pomodoro_mode else "Continuous"
+                self.log_session(duration, mode)
         self.root.destroy()
 
 
 if __name__ == "__main__":
-    CronometroEstudo()
+    StudyTimer()

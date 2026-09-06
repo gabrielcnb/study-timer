@@ -30,7 +30,7 @@ Desktop study timer with Pomodoro mode, per-subject tracking, session history, a
 | Charts | matplotlib (TkAgg) | Daily study hours bar charts |
 | System tray | pystray | Minimize-to-tray icon |
 | Icon rendering | Pillow | Dynamic tray icon generation |
-| Session history | csv (stdlib) | Persistent session log (`historico.csv`) |
+| Session history | csv (stdlib) | Persistent session log (`history.csv`) |
 | Data export | json (stdlib) | JSON export of all session data |
 
 ## Setup
@@ -58,7 +58,7 @@ python main.py
 **Continuous mode:**
 1. Select a subject from the dropdown.
 2. Click "Start". The timer counts up.
-3. Click "Pause" to stop. The duration is saved to `historico.csv`.
+3. Click "Pause" to stop. The duration is saved to `history.csv`.
 
 **Pomodoro mode:**
 1. Go to "Settings" tab and click "Enable Pomodoro Mode".
@@ -69,7 +69,7 @@ python main.py
 
 **Reports:** Go to "Reports" tab and click "Generate Chart" to see a bar chart of daily study hours.
 
-**Export:** In "Settings", click "Export Data (JSON)" to save all records to `historico.json`.
+**Export:** In "Settings", click "Export Data (JSON)" to save all records to `history.json`.
 
 ## File Structure
 
